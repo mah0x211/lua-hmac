@@ -38,6 +38,10 @@ function testcase.sha()
         local digest1 = ctx:final()
         assert.equal(digest1, SHA[k])
 
+        -- test that method chaining
+        digest1 = ctx:init():update(table.concat(MSG, '')):final()
+        assert.equal(digest1, SHA[k])
+
         -- test that initialize context
         ctx:init()
 
