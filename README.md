@@ -41,23 +41,16 @@ ctx = hmac.sha512( [key] )
 ## Input a message
 
 ```
-ctx:update( [msg] )
+ctx = ctx:update( [msg] )
 ```
 
 **Parameters**
 
 - `msg:string`: a message string.
 
+**Returns**
 
-## Input a message
-
-```
-ctx:update( [msg] )
-```
-
-**Parameters**
-
-- `msg:string`: a message string.
+- `ctx:hmac.sha<N>`: the context.
 
 
 ## Generate a hexadecimal digest string
@@ -75,7 +68,7 @@ local s = ctx:final()
 ## Reset a context
 
 ```
-ctx:init( [key] )
+ctx = ctx:init( [key] )
 ```
 
 **Parameters**
@@ -84,3 +77,6 @@ ctx:init( [key] )
   - if a `nil` is specified, initialize the internal data and the context can be reused.
   - if an empty-string (`''`) is specified, the current secret key is cleared and the context will compute only the message digest.
 
+**Returns**
+
+- `ctx:hmac.sha<N>`: the context.

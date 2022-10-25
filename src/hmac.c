@@ -185,7 +185,8 @@ static int update_lua(lua_State *L)
 
 #undef update_context
 
-    return 0;
+    lua_settop(L, 1);
+    return 1;
 }
 
 static inline void init_context(lua_State *L, lhmac_ctx *hctx, int reinit)
@@ -250,8 +251,8 @@ static int init_lua(lua_State *L)
     }
 
     init_context(L, hctx, reinit);
-
-    return 0;
+    lua_settop(L, 1);
+    return 1;
 }
 
 static int new_lua(lua_State *L)
