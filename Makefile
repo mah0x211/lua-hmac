@@ -19,9 +19,7 @@ $(TARGET): $(OBJS)
 
 install:
 	$(INSTALL) $(TARGET) $(LIBDIR)
-	rm -f ./src/*.o
-	rm -f ./*.so
+	rm -f ./src/*.o ./*.so ./src/*.gcda
 
 clean:
-	rm -f ./src/*.o
-	rm -f ./*.so
+	rm -f ./src/*.o ./*.so ./src/*.gcda

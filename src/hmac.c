@@ -49,10 +49,10 @@ static int tostring_lua(lua_State *L)
     lhmac_ctx *hctx = lauxh_checkudata(L, 1, MODULE_MT);
 
 #define push_string(bits)                                                      \
- do {                                                                          \
-  lua_pushfstring(L, MODULE_MT ".sha" #bits ": %p", hctx);                     \
-  return 1;                                                                    \
- } while (0)
+    do {                                                                       \
+        lua_pushfstring(L, MODULE_MT ".sha" #bits ": %p", hctx);               \
+        return 1;                                                              \
+    } while (0)
 
     switch (hctx->bit) {
     case T_SHA224:
@@ -111,17 +111,19 @@ static int final_lua(lua_State *L)
 {
     static unsigned char digest[SHA512_DIGEST_SIZE];
     lhmac_ctx *hctx = lauxh_checkudata(L, 1, MODULE_MT);
+    int isbinary    = lauxh_optboolean(L, 2, 0);
     size_t len      = SHA512_DIGEST_SIZE;
 
 #define final_context(bits)                                                    \
- do {                                                                          \
-  len = SHA##bits##_DIGEST_SIZE;                                               \
-  if ((hctx)->key) {                                                           \
-   hmac_sha##bits##_final((hmac_sha##bits##_ctx *)&(hctx)->ctx, digest, len);  \
-  } else {                                                                     \
-   sha##bits##_final((sha##bits##_ctx *)&(hctx)->ctx, digest);                 \
-  }                                                                            \
- } while (0)
+    do {                                                                       \
+        len = SHA##bits##_DIGEST_SIZE;                                         \
+        if ((hctx)->key) {                                                     \
+            hmac_sha##bits##_final((hmac_sha##bits##_ctx *)&(hctx)->ctx,       \
+                                   digest, len);                               \
+        } else {                                                               \
+            sha##bits##_final((sha##bits##_ctx *)&(hctx)->ctx, digest);        \
+        }                                                                      \
+    } while (0)
 
     switch (hctx->bit) {
     case T_SHA224:
@@ -142,6 +144,10 @@ static int final_lua(lua_State *L)
 
 #undef final_context
 
+    if (isbinary) {
+        lua_pushlstring(L, (const char *)digest, len);
+        return 1;
+    }
     return digest2hex(L, digest, len);
 }
 
@@ -158,13 +164,14 @@ static int update_lua(lua_State *L)
     }
 
 #define update_context(bits)                                                   \
- do {                                                                          \
-  if ((hctx)->key) {                                                           \
-   hmac_sha##bits##_update((hmac_sha##bits##_ctx *)&(hctx)->ctx, msg, len);    \
-  } else {                                                                     \
-   sha##bits##_update((sha##bits##_ctx *)&(hctx)->ctx, msg, len);              \
-  }                                                                            \
- } while (0)
+    do {                                                                       \
+        if ((hctx)->key) {                                                     \
+            hmac_sha##bits##_update((hmac_sha##bits##_ctx *)&(hctx)->ctx, msg, \
+                                    len);                                      \
+        } else {                                                               \
+            sha##bits##_update((sha##bits##_ctx *)&(hctx)->ctx, msg, len);     \
+        }                                                                      \
+    } while (0)
 
     switch (hctx->bit) {
     case T_SHA224:
@@ -192,18 +199,18 @@ static int update_lua(lua_State *L)
 static inline void init_context(lua_State *L, lhmac_ctx *hctx, int reinit)
 {
 #define init_bit_context(bits)                                                 \
- do {                                                                          \
-  if ((hctx)->key) {                                                           \
-   if (reinit) {                                                               \
-    hmac_sha##bits##_reinit((hmac_sha##bits##_ctx *)&(hctx)->ctx);             \
-   } else {                                                                    \
-    hmac_sha##bits##_init((hmac_sha##bits##_ctx *)&(hctx)->ctx, (hctx)->key,   \
-                          (hctx)->len);                                        \
-   }                                                                           \
-  } else {                                                                     \
-   sha##bits##_init((sha##bits##_ctx *)&(hctx)->ctx);                          \
-  }                                                                            \
- } while (0)
+    do {                                                                       \
+        if ((hctx)->key) {                                                     \
+            if (reinit) {                                                      \
+                hmac_sha##bits##_reinit((hmac_sha##bits##_ctx *)&(hctx)->ctx); \
+            } else {                                                           \
+                hmac_sha##bits##_init((hmac_sha##bits##_ctx *)&(hctx)->ctx,    \
+                                      (hctx)->key, (hctx)->len);               \
+            }                                                                  \
+        } else {                                                               \
+            sha##bits##_init((sha##bits##_ctx *)&(hctx)->ctx);                 \
+        }                                                                      \
+    } while (0)
 
     switch (hctx->bit) {
     case T_SHA224:
@@ -317,11 +324,11 @@ LUALIB_API int luaopen_hmac(lua_State *L)
 
     lua_newtable(L);
 #define push_closure(name, type)                                               \
- do {                                                                          \
-  lua_pushinteger(L, (type));                                                  \
-  lua_pushcclosure(L, new_lua, 1);                                             \
-  lua_setfield(L, -2, (name));                                                 \
- } while (0)
+    do {                                                                       \
+        lua_pushinteger(L, (type));                                            \
+        lua_pushcclosure(L, new_lua, 1);                                       \
+        lua_setfield(L, -2, (name));                                           \
+    } while (0)
     push_closure("sha224", T_SHA224);
     push_closure("sha256", T_SHA256);
     push_closure("sha384", T_SHA384);
