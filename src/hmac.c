@@ -20,7 +20,7 @@
  *  DEALINGS IN THE SOFTWARE.
  */
 
-#include "../deps/hmac/hmac_sha2.h"
+#include "hmac_sha2.h"
 #include <lauxhlib.h>
 
 typedef struct {
