@@ -22,7 +22,7 @@ local hmac = require('hmac')
 
 ## Create a context
 
-```
+```lua
 ctx = hmac.sha224( [key] )
 ctx = hmac.sha256( [key] )
 ctx = hmac.sha384( [key] )
@@ -40,7 +40,7 @@ ctx = hmac.sha512( [key] )
 
 ## Input a message
 
-```
+```lua
 ctx = ctx:update( [msg] )
 ```
 
@@ -53,21 +53,25 @@ ctx = ctx:update( [msg] )
 - `ctx:hmac.sha<N>`: the context.
 
 
-## Generate a hexadecimal digest string
+## Generate a digest string
 
+```lua
+local s = ctx:final( [tobinary] )
 ```
-local s = ctx:final()
-```
+
+**Parameters**
+
+- `tobinary:boolean`: If `true` is specified, a binary digest string is returned. otherwise, return the hexadecimal digest string. (default: `false`)
 
 **Returns**
 
-- `s:string`: a hexadecimal digest string.
+- `s:string`: a digest string.
 
 
 
 ## Reset a context
 
-```
+```lua
 ctx = ctx:init( [key] )
 ```
 
