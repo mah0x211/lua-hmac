@@ -1,5 +1,5 @@
 TARGET=$(PACKAGE).$(LIB_EXTENSION)
-SRCS=$(wildcard ./deps/hmac/*.c) $(wildcard src/*.c)
+SRCS=$(wildcard src/*.c)
 OBJS=$(SRCS:.c=.o)
 INSTALL?=install
 
