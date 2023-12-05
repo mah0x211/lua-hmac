@@ -1,4 +1,5 @@
 local testcase = require('testcase')
+local hex = require('hex')
 local hmac = require('hmac')
 
 local MSG = {
@@ -8,6 +9,7 @@ local MSG = {
     ' ',
     'world!',
 }
+local MSG_STR = table.concat(MSG, '')
 local SHA = {
     sha224 = 'dfacba9733bd8ce28b603574eefa5f8b508aa95d8064a9930d9e5e28',
     sha256 = '331373f986ddc3162beca0e9688366b42b4bad8a6436e2d8910e76eea5676e7f',
@@ -34,18 +36,23 @@ function testcase.sha()
     for k, new in pairs(hmac) do
         local ctx = new()
         -- test that create digest with update
-        ctx:update(table.concat(MSG, ''))
+        ctx:update(MSG_STR)
         local digest1 = ctx:final()
-        assert.equal(digest1, SHA[k])
-
-        -- test that method chaining
-        digest1 = ctx:init():update(table.concat(MSG, '')):final()
         assert.equal(digest1, SHA[k])
 
         -- test that initialize context
         ctx:init()
 
+        -- test that method chaining
+        digest1 = ctx:init():update(MSG_STR):final()
+        assert.equal(digest1, SHA[k])
+
+        -- test that binary digest
+        local bin = ctx:init():update(MSG_STR):final(true)
+        assert.equal(digest1, hex.encode(bin))
+
         -- test that create digest with multi update
+        ctx:init()
         for _, s in ipairs(MSG) do
             ctx:update(s)
         end
@@ -60,14 +67,19 @@ function testcase.hmac()
     for k, new in pairs(hmac) do
         local ctx = new(KEY)
         -- test that create digest with update
-        ctx:update(table.concat(MSG, ''))
+        ctx:update(MSG_STR)
         local digest1 = ctx:final()
         assert.equal(digest1, HMAC_SHA[k])
 
         -- test that initialize context
         ctx:init()
 
+        -- test that binary digest
+        local bin = ctx:init():update(MSG_STR):final(true)
+        assert.equal(digest1, hex.encode(bin))
+
         -- test that create digest with multi update
+        ctx:init()
         for _, s in ipairs(MSG) do
             ctx:update(s)
         end
@@ -76,7 +88,7 @@ function testcase.hmac()
 
         -- test that initialize context with new key
         ctx:init('new-key')
-        ctx:update(table.concat(MSG, ''))
+        ctx:update(MSG_STR)
         digest1 = ctx:final()
         assert.not_equal(digest1, HMAC_SHA[k])
     end
