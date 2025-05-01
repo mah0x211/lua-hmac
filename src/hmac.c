@@ -38,77 +38,39 @@ typedef struct {
     int ref;
     unsigned int len;
     const unsigned char *key;
-    hmac_sha512_ctx ctx;
+    union {
+        sha224_ctx sha224;
+        sha256_ctx sha256;
+        sha384_ctx sha384;
+        sha512_ctx sha512;
+        hmac_sha224_ctx hmac224;
+        hmac_sha256_ctx hmac256;
+        hmac_sha384_ctx hmac384;
+        hmac_sha512_ctx hmac512;
+    };
 } lhmac_ctx;
 
 #define MODULE_MT "hmac"
 
-static int gc_lua(lua_State *L)
-{
-    lhmac_ctx *hctx = lauxh_checkudata(L, 1, MODULE_MT);
-    lauxh_unref(L, hctx->ref);
-    return 0;
-}
-
-static int tostring_lua(lua_State *L)
-{
-    lhmac_ctx *hctx = lauxh_checkudata(L, 1, MODULE_MT);
-
-#define push_string(bits)                                                      \
-    do {                                                                       \
-        lua_pushfstring(L, MODULE_MT ".sha" #bits ": %p", hctx);               \
-        return 1;                                                              \
-    } while (0)
-
-    switch (hctx->bit) {
-    case T_SHA224:
-        push_string(224);
-    case T_SHA256:
-        push_string(256);
-    case T_SHA384:
-        push_string(384);
-    case T_SHA512:
-        push_string(512);
-    default:
-        return lauxh_argerror(L, 1, "invalid context");
-    }
-
-#undef push_string
-}
-
 // dest length must be greater than len*2
-static inline int digest2hex(lua_State *L, unsigned char *digest, size_t len)
+static inline int digest2hex(lua_State *L, const unsigned char *digest,
+                             size_t len)
 {
     static const char dec2hex[16] = "0123456789abcdef";
     size_t hexlen                 = len * 2;
-    luaL_Buffer b                 = {0};
-    unsigned char *buf            = NULL;
-    unsigned char *ptr            = NULL;
-    size_t i                      = 0;
-    size_t n                      = 0;
+    unsigned char buf[64 * 2]     = {}; // MAX_DIGEST_SIZE(512-bit/8) * 2
+    unsigned char *ptr            = buf;
 
-    luaL_buffinit(L, &b);
-    buf = (unsigned char *)luaL_prepbuffer(&b);
-    if (hexlen > LUAL_BUFFERSIZE) {
-        n = hexlen / LUAL_BUFFERSIZE;
-        for (size_t k = 0; k < n; k++) {
-            ptr = buf;
-            for (; i < len; i++) {
-                *ptr++ = dec2hex[digest[i] >> 4];
-                *ptr++ = dec2hex[digest[i] & 0xf];
-            }
-            luaL_addsize(&b, (uintptr_t)ptr - (uintptr_t)buf);
-            buf = (unsigned char *)luaL_prepbuffer(&b);
-        }
+    if (len > 64) {
+        // SHA512_DIGEST_SIZE is 64 bytes
+        return luaL_error(L, "digest length too large");
     }
 
-    ptr = buf;
-    for (; i < len; i++) {
+    for (size_t i = 0; i < len; i++) {
         *ptr++ = dec2hex[digest[i] >> 4];
         *ptr++ = dec2hex[digest[i] & 0xf];
     }
-    luaL_addsize(&b, (uintptr_t)ptr - (uintptr_t)buf);
-    luaL_pushresult(&b);
+    lua_pushlstring(L, (const char *)buf, hexlen);
 
     return 1;
 }
@@ -123,11 +85,10 @@ static int final_lua(lua_State *L)
 #define final_context(bits)                                                    \
     do {                                                                       \
         len = SHA##bits##_DIGEST_SIZE;                                         \
-        if ((hctx)->key) {                                                     \
-            hmac_sha##bits##_final((hmac_sha##bits##_ctx *)&(hctx)->ctx,       \
-                                   digest, len);                               \
+        if (hctx->key) {                                                       \
+            hmac_sha##bits##_final(&hctx->hmac##bits, digest, len);            \
         } else {                                                               \
-            sha##bits##_final((sha##bits##_ctx *)&(hctx)->ctx, digest);        \
+            sha##bits##_final(&hctx->sha##bits, digest);                       \
         }                                                                      \
     } while (0)
 
@@ -171,11 +132,10 @@ static int update_lua(lua_State *L)
 
 #define update_context(bits)                                                   \
     do {                                                                       \
-        if ((hctx)->key) {                                                     \
-            hmac_sha##bits##_update((hmac_sha##bits##_ctx *)&(hctx)->ctx, msg, \
-                                    len);                                      \
+        if (hctx->key) {                                                       \
+            hmac_sha##bits##_update(&hctx->hmac##bits, msg, len);              \
         } else {                                                               \
-            sha##bits##_update((sha##bits##_ctx *)&(hctx)->ctx, msg, len);     \
+            sha##bits##_update(&hctx->sha##bits, msg, len);                    \
         }                                                                      \
     } while (0)
 
@@ -206,15 +166,15 @@ static inline void init_context(lua_State *L, lhmac_ctx *hctx, int reinit)
 {
 #define init_bit_context(bits)                                                 \
     do {                                                                       \
-        if ((hctx)->key) {                                                     \
+        if (hctx->key) {                                                       \
             if (reinit) {                                                      \
-                hmac_sha##bits##_reinit((hmac_sha##bits##_ctx *)&(hctx)->ctx); \
+                hmac_sha##bits##_reinit(&hctx->hmac##bits);                    \
             } else {                                                           \
-                hmac_sha##bits##_init((hmac_sha##bits##_ctx *)&(hctx)->ctx,    \
-                                      (hctx)->key, (hctx)->len);               \
+                hmac_sha##bits##_init(&hctx->hmac##bits, hctx->key,            \
+                                      hctx->len);                              \
             }                                                                  \
         } else {                                                               \
-            sha##bits##_init((sha##bits##_ctx *)&(hctx)->ctx);                 \
+            sha##bits##_init(&hctx->sha##bits);                                \
         }                                                                      \
     } while (0)
 
@@ -243,29 +203,57 @@ static int init_lua(lua_State *L)
     lhmac_ctx *hctx = lauxh_checkudata(L, 1, MODULE_MT);
     size_t len      = 0;
     const char *key = lauxh_optlstring(L, 2, NULL, &len);
-    int reinit      = key == NULL;
 
-    if (!reinit) {
+    if (key) {
         if (len > UINT_MAX) {
             return lauxh_argerror(
                 L, 2, "key length must be less than or equal to %d", UINT_MAX);
         }
         // remove current key
-        hctx->len = (unsigned int)len;
-        hctx->key = NULL;
         hctx->ref = lauxh_unref(L, hctx->ref);
-        if (len) {
-            // set new key
-            lua_settop(L, 2);
-            hctx->key = (const unsigned char *)key;
-            hctx->ref = lauxh_ref(L);
-        }
-        lua_settop(L, 1);
+        // set new key
+        hctx->len = (unsigned int)len;
+        hctx->key = (const unsigned char *)key;
+        lua_settop(L, 2);
+        hctx->ref = lauxh_ref(L);
     }
 
-    init_context(L, hctx, reinit);
+    init_context(L, hctx, !key);
     lua_settop(L, 1);
     return 1;
+}
+
+static int gc_lua(lua_State *L)
+{
+    lhmac_ctx *hctx = lauxh_checkudata(L, 1, MODULE_MT);
+    lauxh_unref(L, hctx->ref);
+    return 0;
+}
+
+static int tostring_lua(lua_State *L)
+{
+    lhmac_ctx *hctx = lauxh_checkudata(L, 1, MODULE_MT);
+
+#define push_string(bits)                                                      \
+    do {                                                                       \
+        lua_pushfstring(L, MODULE_MT ".sha" #bits ": %p", hctx);               \
+        return 1;                                                              \
+    } while (0)
+
+    switch (hctx->bit) {
+    case T_SHA224:
+        push_string(224);
+    case T_SHA256:
+        push_string(256);
+    case T_SHA384:
+        push_string(384);
+    case T_SHA512:
+        push_string(512);
+    default:
+        return lauxh_argerror(L, 1, "invalid context");
+    }
+
+#undef push_string
 }
 
 static int new_lua(lua_State *L)
@@ -284,7 +272,7 @@ static int new_lua(lua_State *L)
     lua_pop(L, 1);
 
     // check key length
-    if (len) {
+    if (key) {
         if (len > UINT_MAX) {
             return lauxh_argerror(
                 L, 1, "key length must be less than or equal to %d", UINT_MAX);
