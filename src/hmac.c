@@ -20,8 +20,14 @@
  *  DEALINGS IN THE SOFTWARE.
  */
 
+#include <limits.h>
+#include <stdint.h>
+#include <string.h>
+// lua
+#include "lauxhlib.h"
+#include <lua.h>
+// hmac
 #include "hmac_sha2.h"
-#include <lauxhlib.h>
 
 typedef struct {
 #define T_SHA224 224
