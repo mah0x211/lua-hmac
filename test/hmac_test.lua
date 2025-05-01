@@ -1,4 +1,5 @@
 local testcase = require('testcase')
+local assert = require('assert')
 local hex = require('hex')
 local hmac = require('hmac')
 
