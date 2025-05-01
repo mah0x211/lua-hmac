@@ -272,27 +272,26 @@ static int new_lua(lua_State *L)
 {
     size_t len      = 0;
     const char *key = lauxh_optlstring(L, 1, NULL, &len);
-    lhmac_ctx *hctx = NULL;
+    lhmac_ctx *hctx = lua_newuserdata(L, sizeof(lhmac_ctx));
 
-    if (len) {
-        if (len > UINT_MAX) {
-            return lauxh_argerror(
-                L, 1, "key length must be less than or equal to %d", UINT_MAX);
-        }
-        lua_settop(L, 1);
-    } else {
-        lua_settop(L, 0);
-    }
-    hctx = lua_newuserdata(L, sizeof(lhmac_ctx));
     lua_pushvalue(L, lua_upvalueindex(1));
     *hctx = (lhmac_ctx){
         .ref = LUA_NOREF,
         .len = (unsigned int)len,
         .key = (const unsigned char *)key,
         .bit = lua_tointeger(L, -1),
-        .ctx = {0},
     };
     lua_pop(L, 1);
+
+    // check key length
+    if (len) {
+        if (len > UINT_MAX) {
+            return lauxh_argerror(
+                L, 1, "key length must be less than or equal to %d", UINT_MAX);
+        }
+        hctx->ref = lauxh_refat(L, 1);
+    }
+
     init_context(L, hctx, 0);
     lauxh_setmetatable(L, MODULE_MT);
 
@@ -313,15 +312,14 @@ LUALIB_API int luaopen_hmac(lua_State *L)
             {"final",  final_lua },
             {NULL,     NULL      }
         };
-        struct luaL_Reg *ptr = mmethod;
 
-        for (; ptr->name; ptr++) {
+        for (struct luaL_Reg *ptr = mmethod; ptr->name; ptr++) {
             lauxh_pushfn2tbl(L, ptr->name, ptr->func);
         }
         // methods
         lua_pushstring(L, "__index");
         lua_newtable(L);
-        for (ptr = method; ptr->name; ptr++) {
+        for (struct luaL_Reg *ptr = method; ptr->name; ptr++) {
             lauxh_pushfn2tbl(L, ptr->name, ptr->func);
         }
         lua_rawset(L, -3);
