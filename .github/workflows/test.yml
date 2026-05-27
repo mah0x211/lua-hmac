@@ -56,16 +56,20 @@ jobs:
     -
       name: Install Tools
       run: |
-        sudo apt-get install llvm -y
         luarocks install testcase
         luarocks install hex
     -
-      name: Run Test and Generate Coverage
+      name: Run Tests
       run: |
-        make coverage
+        testcase ./test/
+    -
+      name: Generate Coverage
+      run: |
+        sh ./covgen.sh
     -
       name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         flags: unittests
+        files: coverage/lcov.info
