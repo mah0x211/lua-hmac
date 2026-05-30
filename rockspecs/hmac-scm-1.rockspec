@@ -1,3 +1,4 @@
+rockspec_format = "3.0"
 package = "hmac"
 version = "scm-1"
 source = {
@@ -14,21 +15,31 @@ dependencies = {
     "lua >= 5.1",
     "lauxhlib >= 0.3.1",
 }
+build_dependencies = {
+    "luarocks-build-hooks >= 0.8.0",
+}
 build = {
-    type = 'make',
-    build_variables = {
-        PACKAGE = "hmac",
-        LIB_EXTENSION = "$(LIB_EXTENSION)",
-        CFLAGS = "$(CFLAGS)",
-        WARNINGS = "-Wall -Wno-trigraphs -Wmissing-field-initializers -Wreturn-type -Wmissing-braces -Wparentheses -Wno-switch -Wunused-function -Wunused-label -Wunused-parameter -Wunused-variable -Wunused-value -Wuninitialized -Wunknown-pragmas -Wshadow -Wsign-compare",
-        CPPFLAGS = "-I$(LUA_INCDIR) -I./deps/hmac",
-        LDFLAGS = "$(LIBFLAG)",
-        HMAC_COVERAGE = "$(HMAC_COVERAGE)",
+    type = 'hooks',
+    before_build = "$(extra-vars)",
+    extra_variables = {
+        CFLAGS = "-Wall -Wno-trigraphs -Wmissing-field-initializers -Wreturn-type -Wmissing-braces -Wparentheses -Wno-switch -Wunused-function -Wunused-label -Wunused-parameter -Wunused-variable -Wunused-value -Wuninitialized -Wunknown-pragmas -Wshadow -Wsign-compare",
     },
-    install_variables = {
-        PACKAGE = "hmac",
-        LIB_EXTENSION = "$(LIB_EXTENSION)",
-        LIBDIR = "$(LIBDIR)",
-        LUA_INCDIR = "$(LUA_INCDIR)",
+    conditional_variables = {
+        HMAC_COVERAGE = {
+            CFLAGS = "--coverage",
+            LIBFLAG = "--coverage",
+        },
+    },
+    modules = {
+        ["hmac"] = {
+            sources = {
+                "src/hmac.c",
+                "src/sha2.c",
+                "src/hmac_sha2.c",
+            },
+            incdirs = {
+                "$(DEP_LAUXHLIB_INCDIR)",
+            },
+        },
     },
 }
